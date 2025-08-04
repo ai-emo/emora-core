@@ -1,3 +1,4 @@
+#[derive(Default)]
 pub struct PAD {
     pub(crate) pleasure: f32,
     pub(crate) arousal: f32,
@@ -6,10 +7,14 @@ pub struct PAD {
 
 impl PAD {
     pub fn to_emotion(&self) -> EmotionType {
-        match (self.arousal > 0.7, self.dominance < -0.5) {
-            (true, true) => EmotionType::Fear,
-            (true, false) => EmotionType::Excitement,
-            (false, _) => todo!(),
+        match (self.arousal > 0.7, self.arousal > 0.7, self.dominance < -0.5) {
+            (true, true, true) => EmotionType::Fear,
+            (true, true, false) => EmotionType::Excitement,
+            (true, false, false) => EmotionType::Excitement,
+            (false, false, false) => EmotionType::Excitement,
+            (false, true, true) => EmotionType::Excitement,
+            (false, false, true) => EmotionType::Excitement,
+            (_, _, _) => unimplemented!(),
         }
     }
 }

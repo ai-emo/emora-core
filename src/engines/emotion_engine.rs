@@ -1,8 +1,9 @@
 use std::collections::VecDeque;
 use crate::models::PAD;
 
+#[derive(Default)]
 pub struct EmotionEngine {
-    current_pad: PAD,
+    pub current_pad: PAD,
     memory: VecDeque<PAD>,
 }
 
