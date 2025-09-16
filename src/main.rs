@@ -1,38 +1,20 @@
-use eframe::egui;
-use emora_core::{plot_pad_vector, EmotionEngine};
+use emora_core::{Brain, Stimulus};
 
-fn main() -> eframe::Result {
-    let options = eframe::NativeOptions::default();
+fn main() {
+    let mut agent = Brain::new();
 
-    eframe::run_native(
-        "Emora Core Debugger",
-        options,
-        Box::new(|_cc| Ok(Box::<EmoraDebugger>::default())),
-    )
-}
+    println!("初始: {:?}", agent);
 
-#[derive(Default)]
-struct EmoraDebugger {
-    engine: EmotionEngine,
-    stimulus: String, 
-}
+    let mut step = 0;
+    while agent.energy > 0.0 {
+        println!("\n-- Tick {} --", step + 1);
 
-impl eframe::App for EmoraDebugger {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Emora Control");
-            
-            ui.horizontal(|ui| {
-                ui.label("Input Emo:");
-                ui.text_edit_singleline(&mut self.stimulus);
-                if ui.button("Send").clicked() {
-                    self.engine.update();
-                }
-            });
+        if step == 2 {
+            agent.perceive(Stimulus::Threat(30.0));
+        }
 
-            ui.label(format!("current emo: {:?}", self.engine.current_pad.to_emotion()));
-
-            plot_pad_vector(ui, &self.engine.current_pad);
-        });
+        agent.tick();
+        step += 1;
     }
+    println!("⚠️ 能量耗尽，智能体死亡");
 }

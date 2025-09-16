@@ -1,3 +1,3 @@
-mod emotion_engine;
+mod brain;
 
-pub use emotion_engine::EmotionEngine;
+pub use brain::{Brain, Stimulus};

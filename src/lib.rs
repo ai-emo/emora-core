@@ -1,6 +1,5 @@
 mod models;
 mod engines;
-mod ui;
+mod behavior;
 
-pub use engines::EmotionEngine;
-pub use ui::plot_pad_vector;
+pub use engines::{Brain, Stimulus};
