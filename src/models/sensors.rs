@@ -310,9 +310,10 @@ impl Percept {
             }
         }
 
-        // 处理内部状态感知
-        if energy < 30.0 {
-            let intensity = (1.0 - energy / 30.0).clamp(0.0, 1.0);
+        // 处理内部状态感知 - 饥饿感
+        // 能量低于70就会开始感到饿，想要找食物
+        if energy < 70.0 {
+            let intensity = (1.0 - energy / 70.0).clamp(0.0, 1.0);
             percepts.push(Percept {
                 ptype: PerceptType::Hungry,
                 intensity,

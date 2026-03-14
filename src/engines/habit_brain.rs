@@ -1,7 +1,7 @@
 //! 习惯脑 - 支持短期记忆和TD学习的脑
 
 use std::collections::VecDeque;
-use crate::behavior::{BehaviorController, ReflexController, ReflexArc, ActionExecutor};
+use crate::behavior::{BehaviorController, ReflexController, ReflexArc, ActionExecutor, ReflexType};
 use crate::models::{
     PADInertia, PAD, ProximitySensor, InternalSensor, World, Percept, SensorData, Sensor,
     TDLearner
@@ -15,13 +15,19 @@ pub struct HabitBrain {
     pub current_pad: PAD,
     sensitivity: PADInertia,
     memory: VecDeque<PAD>,
+    // 位置
+    pub position: (f32, f32),
+    // 移动速度
+    pub move_speed: f32,
     // 反射弧系统组件
     proximity_sensor: ProximitySensor,
     internal_sensor: InternalSensor,
     reflex_controller: ReflexController,
-    world: World,
+    pub world: World,
     // 学习系统
     learner: TDLearner,
+    // 当前激发的反射
+    pub current_reflex: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -37,16 +43,19 @@ pub enum ActionMode {
 impl HabitBrain {
     pub fn new() -> Self {
         HabitBrain {
-            energy: 50.0,
+            energy: 70.0,
             safety: 50.0,
             current_pad: PAD { pleasure: 0.0, arousal: 0.5, dominance: 0.0 },
             memory: VecDeque::with_capacity(100),
             sensitivity: PADInertia::default(),
+            position: (50.0, 150.0),
+            move_speed: 15.0,
             proximity_sensor: ProximitySensor::new(0.0, 100.0),
             internal_sensor: InternalSensor::new(),
             reflex_controller: ReflexController::new(),
             world: World::new(),
             learner: TDLearner::default(),
+            current_reflex: None,
         }
     }
 
@@ -141,6 +150,12 @@ impl HabitBrain {
     fn act(&mut self, reflex: &ReflexArc) -> (String, f32) {
         let result = ActionExecutor::execute(&reflex.reflex_type);
 
+        // 记录当前激发的反射
+        self.current_reflex = Some(format!("{:?}", reflex.reflex_type));
+
+        // 根据反射类型移动
+        self.move_towards_target(reflex.reflex_type);
+
         // 应用能量消耗
         let energy_before = self.energy;
         self.energy = (self.energy - result.energy_cost).clamp(0.0, 100.0);
@@ -154,13 +169,127 @@ impl HabitBrain {
         (result.description, energy_delta)
     }
 
+    /// 根据反射移动
+    fn move_towards_target(&mut self, reflex_type: ReflexType) {
+        let (tx, ty) = self.position;
+        let mut new_x = tx;
+        let mut new_y = ty;
+
+        match reflex_type {
+            ReflexType::Approach => {
+                if let Some((fx, fy, energy)) = self.find_nearest_food() {
+                    let dx = fx - tx;
+                    let dy = fy - ty;
+                    let dist = (dx * dx + dy * dy).sqrt();
+
+                    if dist < 10.0 {
+                        // 吃到食物！
+                        println!(">>> 吃到食物！能量+{:.0}", energy);
+                        self.perceive(Stimulus::Food(energy));
+                        self.world.foods.retain(|(x, y, _e)| {
+                            (*x - fx).abs() >= 1.0 || (*y - fy).abs() >= 1.0
+                        });
+                    } else {
+                        new_x = tx + (dx / dist) * self.move_speed;
+                        new_y = ty + (dy / dist) * self.move_speed;
+                    }
+                }
+            }
+            ReflexType::Flee => {
+                if let Some((dx, dy, _)) = self.find_nearest_danger() {
+                    let dist = (dx * dx + dy * dy).sqrt();
+                    if dist > 0.0 {
+                        new_x = tx - (dx / dist) * self.move_speed * 1.5;
+                        new_y = ty - (dy / dist) * self.move_speed * 1.5;
+                    }
+                    if dist < 15.0 {
+                        println!(">>> 受到危险伤害！安全-20");
+                        self.perceive(Stimulus::Threat(20.0));
+                    }
+                }
+            }
+            ReflexType::SeekFood => {
+                // 主动寻找最近的食物
+                if let Some((fx, fy, _)) = self.find_nearest_food() {
+                    let dx = fx - tx;
+                    let dy = fy - ty;
+                    let dist = (dx * dx + dy * dy).sqrt();
+                    new_x = tx + (dx / dist) * self.move_speed;
+                    new_y = ty + (dy / dist) * self.move_speed;
+                } else {
+                    use rand::Rng;
+                    let mut rng = rand::rng();
+                    new_x = tx + rng.random_range(-self.move_speed..self.move_speed);
+                    new_y = ty + rng.random_range(-self.move_speed..self.move_speed);
+                }
+
+                if let Some((dx, dy, _)) = self.find_nearest_danger() {
+                    let dist = (dx * dx + dy * dy).sqrt();
+                    if dist < 15.0 {
+                        println!(">>> 探索遇到危险！安全-10");
+                        self.perceive(Stimulus::Threat(10.0));
+                    }
+                }
+            }
+            ReflexType::Rest => {
+                println!(">>> 休息中...");
+            }
+            ReflexType::Explore => {
+                use rand::Rng;
+                let mut rng = rand::rng();
+                new_x = tx + rng.random_range(-self.move_speed..self.move_speed);
+                new_y = ty + rng.random_range(-self.move_speed..self.move_speed);
+            }
+        }
+
+        new_x = new_x.clamp(10.0, 390.0);
+        new_y = new_y.clamp(10.0, 390.0);
+
+        self.position = (new_x, new_y);
+        self.world.position = (new_x, new_y);
+    }
+
+    /// 寻找最近的食物
+    fn find_nearest_food(&self) -> Option<(f32, f32, f32)> {
+        let mut closest: Option<(f32, f32, f32)> = None;
+        let mut closest_dist = f32::MAX;
+
+        for (x, y, e) in &self.world.foods {
+            let dx = x - self.position.0;
+            let dy = y - self.position.1;
+            let dist = (dx * dx + dy * dy).sqrt();
+            if dist < closest_dist {
+                closest_dist = dist;
+                closest = Some((*x, *y, *e));
+            }
+        }
+        closest
+    }
+
+    /// 寻找最近的危险
+    fn find_nearest_danger(&self) -> Option<(f32, f32, f32)> {
+        let mut closest: Option<(f32, f32, f32)> = None;
+        let mut closest_dist = f32::MAX;
+
+        for (x, y, t) in &self.world.dangers {
+            let dx = x - self.position.0;
+            let dy = y - self.position.1;
+            let dist = (dx * dx + dy * dy).sqrt();
+            if dist < closest_dist {
+                closest_dist = dist;
+                closest = Some((*x, *y, *t));
+            }
+        }
+        closest
+    }
+
     /// 习惯生物的tick
     pub fn tick_habit(&mut self) {
         println!("\n=== 习惯脑 Tick 开始 ===");
 
         // 1. 自然能量消耗
         let energy_before = self.energy;
-        self.energy = (self.energy - 1.0).clamp(0.0, 100.0);
+        self.energy = (self.energy - 0.3).clamp(0.0, 100.0);
 
         // 2. 感知阶段
         let sensor_data = self.sense();

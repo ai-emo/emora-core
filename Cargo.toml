@@ -5,3 +5,13 @@ edition = "2024"
 
 [dependencies]
 rand = "0.10.0-rc.0"
+eframe = "0.31"
+egui = "0.31"
+
+[[bin]]
+name = "emora-gui"
+path = "src/main_gui.rs"
+
+[[bin]]
+name = "emora"
+path = "src/main.rs"

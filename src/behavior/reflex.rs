@@ -117,11 +117,11 @@ pub fn get_default_reflexes() -> Vec<ReflexArc> {
         // 危险感知 → 逃离
         ReflexArc::new(PerceptType::DangerDetected, 0.1, ReflexType::Flee, 100),
         // 感知到食物 → 趋近
-        ReflexArc::new(PerceptType::FoodDetected, 0.1, ReflexType::Approach, 80),
-        // 饥饿 → 觅食
-        ReflexArc::new(PerceptType::Hungry, 0.3, ReflexType::SeekFood, 70),
-        // 感到安全且不饿 → 休息
-        ReflexArc::new(PerceptType::Safe, 0.5, ReflexType::Rest, 10),
+        ReflexArc::new(PerceptType::FoodDetected, 0.1, ReflexType::Approach, 85),
+        // 饥饿 → 觅食（降低阈值，更容易触发）
+        ReflexArc::new(PerceptType::Hungry, 0.1, ReflexType::SeekFood, 80),
+        // 什么都没感知到 → 探索
+        ReflexArc::new(PerceptType::NothingDetected, 0.0, ReflexType::Explore, 50),
     ]
 }
 

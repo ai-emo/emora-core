@@ -1,8 +1,8 @@
 #[derive(Debug)]
 pub struct PAD {
-    pub(crate) pleasure: f32,
-    pub(crate) arousal: f32,
-    pub(crate) dominance: f32
+    pub pleasure: f32,
+    pub arousal: f32,
+    pub dominance: f32
 }
 
 #[derive(Debug)]
