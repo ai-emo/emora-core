@@ -1,7 +1,8 @@
 use rand::Rng;
 use crate::{Brain, Stimulus};
+use crate::engines::habit_brain::HabitBrain;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Behavior {
     SeekFood,
     Explore,
@@ -31,7 +32,6 @@ impl BehaviorController {
                 let mut rng = rand::rng();
                 if rng.random_bool(0.3) {
                     println!("找到食物，能量+4");
-                    // 模拟找到少量食物
                     emo.perceive(Stimulus::Food(5.0));
                 } else {
                     println!("没找到食物，什么也没得到");
@@ -39,12 +39,49 @@ impl BehaviorController {
             }
             Behavior::Explore => {
                 println!("行动: 探索环境");
-                // 探索可能带来威胁
                 emo.perceive(Stimulus::Threat(2.0));
             }
             Behavior::Rest => {
                 println!("行动: 休息恢复");
-                // 休息稍微提升安全感
+                emo.perceive(Stimulus::Comfort(1.0));
+            }
+            Behavior::Idle => {
+                println!("行动: 无事可做，等待...");
+            }
+        }
+    }
+
+    // 为HabitBrain实现的方法
+    pub(crate) fn decide_habit(emo: &mut HabitBrain) -> Behavior {
+        if emo.current_pad.pleasure < -0.3 {
+            Behavior::SeekFood
+        } else if emo.current_pad.arousal > 0.7 {
+            Behavior::Explore
+        } else if emo.current_pad.pleasure > 0.5 && emo.current_pad.arousal < 0.3 {
+            Behavior::Rest
+        } else {
+            Behavior::Idle
+        }
+    }
+
+    pub(crate) fn act_habit(emo: &mut HabitBrain, behavior: &Behavior) {
+        match behavior {
+            Behavior::SeekFood => {
+                println!("行动: 寻找食物");
+                let mut rng = rand::rng();
+                if rng.random_bool(0.3) {
+                    println!("找到食物，能量+4");
+                    emo.perceive(Stimulus::Food(5.0));
+                } else {
+                    println!("没找到食物，什么也没得到");
+                }
+            }
+            Behavior::Explore => {
+                println!("行动: 探索环境");
+                emo.perceive(Stimulus::Threat(2.0));
+            }
+            Behavior::Rest => {
+                println!("行动: 休息恢复");
                 emo.perceive(Stimulus::Comfort(1.0));
             }
             Behavior::Idle => {
