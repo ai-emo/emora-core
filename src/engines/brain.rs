@@ -1,11 +1,12 @@
 use std::collections::VecDeque;
 use crate::behavior::{BehaviorController, ReflexController, ReflexArc, ActionExecutor};
 use crate::models::{PADInertia, PAD, ProximitySensor, InternalSensor, World, Percept, SensorData, Sensor};
+use crate::models::{MotivationController};
 
 #[derive(Debug)]
 pub struct Brain {
     pub energy: f32,
-    safety: f32,
+    pub safety: f32,
     pub current_pad: PAD,
     sensitivity: PADInertia,
     memory: VecDeque<PAD>,
@@ -20,6 +21,8 @@ pub struct Brain {
     pub world: World,
     // 当前激发的反射
     pub current_reflex: Option<String>,
+    // 动机系统
+    motivation: MotivationController,
 }
 
 #[derive(Debug)]
@@ -44,6 +47,7 @@ impl Brain {
             reflex_controller: ReflexController::new(),
             world: World::new(),
             current_reflex: None,
+            motivation: MotivationController::new(),
         }
     }
 
@@ -69,6 +73,14 @@ impl Brain {
         let hunger = 1.0 - (self.energy / 100.0);
         let fear = 1.0 - (self.safety / 100.0);
         self.current_pad.arousal = ((hunger + fear) / 2.0).clamp(0.0, 1.0);
+
+        // 更新动机
+        self.motivation.update_from_state(self.energy, self.safety);
+    }
+
+    /// 获取当前的主要动机
+    pub fn get_dominant_motivation(&self) -> crate::models::Motivation {
+        self.motivation.get_dominant()
     }
 
     /// 感知阶段：传感器获取信息

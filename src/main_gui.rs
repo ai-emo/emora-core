@@ -149,9 +149,19 @@ impl eframe::App for CreatureApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            let (energy, pad, position) = match self.brain_type {
-                BrainType::Reflex => (self.reflex_brain.energy, &self.reflex_brain.current_pad, self.reflex_brain.position),
-                BrainType::Habit => (self.habit_brain.energy, &self.habit_brain.current_pad, self.habit_brain.position),
+            let (energy, pad, position, safety) = match self.brain_type {
+                BrainType::Reflex => (
+                    self.reflex_brain.energy,
+                    &self.reflex_brain.current_pad,
+                    self.reflex_brain.position,
+                    self.reflex_brain.safety
+                ),
+                BrainType::Habit => (
+                    self.habit_brain.energy,
+                    &self.habit_brain.current_pad,
+                    self.habit_brain.position,
+                    self.habit_brain.safety
+                ),
             };
 
             let avail = ui.available_size();
@@ -284,13 +294,19 @@ impl eframe::App for CreatureApp {
                 ui.horizontal_wrapped(|ui| {
                     ui.set_width(map_w);
                     ui.label(egui::RichText::new("Energy:").size(13.0).color(egui::Color32::GRAY));
-                    ui.add(egui::ProgressBar::new(energy / 100.0).fill(ec).desired_width(100.0));
+                    ui.add(egui::ProgressBar::new(energy / 100.0).fill(ec).desired_width(80.0));
                     ui.label(egui::RichText::new(format!("{:>4.0}%", energy)).size(13.0).color(ec));
                     ui.separator();
-                    ui.label(egui::RichText::new(format!("P:{:+.2} A:{:+.2} D:{:+.2}", pad.pleasure, pad.arousal, pad.dominance)).size(12.0).color(egui::Color32::LIGHT_GRAY));
+                    // 安全条
+                    let sc = if safety < 25.0 { egui::Color32::from_rgb(240, 100, 130) } else if safety < 50.0 { egui::Color32::from_rgb(240, 180, 100) } else { egui::Color32::from_rgb(150, 200, 220) };
+                    ui.label(egui::RichText::new("Safety:").size(13.0).color(egui::Color32::GRAY));
+                    ui.add(egui::ProgressBar::new(safety / 100.0).fill(sc).desired_width(80.0));
+                    ui.label(egui::RichText::new(format!("{:>4.0}%", safety)).size(13.0).color(sc));
                     ui.separator();
-                    let (et, ec) = emotion_label(pad.pleasure, pad.arousal);
-                    ui.label(egui::RichText::new(et).size(14.0).color(ec));
+                    // 感受显示（基于PAD值）
+                    let feeling = get_feeling_text(pad.pleasure, pad.arousal);
+                    let feeling_color = get_feeling_color(pad.pleasure, pad.arousal);
+                    ui.label(egui::RichText::new(feeling).size(14.0).color(feeling_color));
                     ui.separator();
                     ui.label(egui::RichText::new(format!("Food: {}", self.world.foods.len())).size(13.0).color(egui::Color32::GRAY));
                 });
@@ -310,14 +326,25 @@ impl eframe::App for CreatureApp {
     }
 }
 
-fn emotion_label(p: f32, a: f32) -> (String, egui::Color32) {
-    if p < -0.3 && a > 0.6 { ("Scared!".to_string(), egui::Color32::from_rgb(255, 100, 150)) }
-    else if p < -0.3 && a < 0.4 { ("Sad...".to_string(), egui::Color32::from_rgb(180, 150, 220)) }
-    else if p > 0.3 && a > 0.6 { ("Excited!".to_string(), egui::Color32::from_rgb(255, 200, 100)) }
-    else if p > 0.3 && a < 0.4 { ("Peaceful~".to_string(), egui::Color32::from_rgb(150, 220, 150)) }
-    else if p > 0.0 { ("Happy:)".to_string(), egui::Color32::from_rgb(180, 220, 130)) }
-    else if p < 0.0 { ("Unhappy:(".to_string(), egui::Color32::from_rgb(220, 180, 130)) }
-    else { ("Normal".to_string(), egui::Color32::GRAY) }
+fn get_feeling_text(pleasure: f32, arousal: f32) -> String {
+    if pleasure > 0.3 && arousal > 0.5 { "Feeling good!" }
+    else if pleasure > 0.3 { "Content" }
+    else if pleasure < -0.3 && arousal > 0.5 { "Anxious" }
+    else if pleasure < -0.3 { "Uncomfortable" }
+    else if arousal > 0.7 { "Alert" }
+    else if arousal < 0.3 { "Relaxed" }
+    else { "Neutral" }
+    .to_string()
+}
+
+fn get_feeling_color(pleasure: f32, arousal: f32) -> egui::Color32 {
+    if pleasure > 0.3 && arousal > 0.5 { egui::Color32::from_rgb(255, 200, 100) }
+    else if pleasure > 0.3 { egui::Color32::from_rgb(150, 220, 150) }
+    else if pleasure < -0.3 && arousal > 0.5 { egui::Color32::from_rgb(255, 100, 150) }
+    else if pleasure < -0.3 { egui::Color32::from_rgb(200, 100, 150) }
+    else if arousal > 0.7 { egui::Color32::from_rgb(255, 180, 150) }
+    else if arousal < 0.3 { egui::Color32::from_rgb(150, 200, 220) }
+    else { egui::Color32::from_rgb(200, 200, 200) }
 }
 
 fn main() {
